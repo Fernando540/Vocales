@@ -8,6 +8,10 @@ import cmath
 CHUNK = 40
 MUESTRAS = 32768
 vocales = ['a', 'e', 'i', 'o', 'u']
+dir_path = os.path.dirname(os.path.realpath(__file__))
+file_name = dir_path + '\\\\' + 'vocalTest.wav'
+nombre_carpeta_audios = 'audioVocales'
+carpeta_audios = dir_path + "\\" + nombre_carpeta_audios
 
 """*************************FUNCIONES PARA CALCULAR LA FFT************************************"""
 def bitInverso(sec):
@@ -62,9 +66,6 @@ def FFT(sec,maxBit,bitI):
 #Arumentos: 
 #   guardar(Booleano):indica si se desea guardar los rangos calculados en su correspondiente vocal así como recalcular lospromedios
 def grabar(guardar,useMic):
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    file_name = dir_path + '\\\\' + 'vocalTest.wav'
-
     #fs = 44100  # Sample rate
     fs = MUESTRAS
     seconds = 1  # Duration of recording
@@ -110,10 +111,13 @@ def grabar(guardar,useMic):
     plt.show()
 
 def promediar():
-    #vocales = ['e', 'i']
     fproms = open('proms.txt','w')
     for vocal in vocales:
-        f = open(f'{vocal}.txt','r')
+        filepath = dir_path + '\\\\' + f'{vocal}.txt'
+        if os.path.isfile(filepath):
+            f = open(f'{vocal}.txt','r')
+        else:
+            f = open(f'{vocal}.txt','w')
         lineas = []
         prom = np.zeros(CHUNK)
         lines = f.readlines()
@@ -161,14 +165,29 @@ def reconocer(rangos):
     vowel = vocales[indice]
     return vowel
 
+def grabaVocales():
+    nombre_persona = input("Ingrese su nombre: ")
+    seconds = 1  # Duration of recording
+    for i in range(5):
+        try:
+            os.makedirs(carpeta_audios + '\\' + vocales[i])
+        except FileExistsError:
+            pass
+        print(f'Grabando {vocales[i]}...')
+        file_name = f'{vocales[i] + nombre_persona}.wav'
+        myrecording = sd.rec(int(seconds * MUESTRAS), samplerate=MUESTRAS, channels=1)
+        sd.wait()  # Wait until recording is finished
+        write(carpeta_audios + '\\' + vocales[i]+ '\\' + file_name, MUESTRAS, myrecording)  # Save as WAV file
+        print('Finalizado!')
+
 def menu():
     print('\n*************************RECONOCIMIENTO DE VOCALES A PARTIR DE ESPECTOGRAMA************************************')
-    print("Selecciona una opción\n0: Agregar desde archivo\n1: Agregar con microfono\n2: Reconocer desde archivo\n3: Reconocer con microfono\n4: Recalcular Promedios\nOtro: Salir")
+    print("Selecciona una opción\n0: Grabar vocales\n1: Agregar muestra de vocal\n2: Reconocer desde archivo\n3: Reconocer con microfono\n4: Recalcular Promedios\nOtro: Salir")
     opc = input()
     if(opc == '0'):
-        grabar(True,False)
+        grabaVocales()
         menu()
-    if(opc == '1'):
+    elif(opc == '1'):
         grabar(True,True)
         menu()
     elif(opc== '2'):
