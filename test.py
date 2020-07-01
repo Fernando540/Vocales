@@ -4,12 +4,14 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt 
 import cmath
+import pathlib
 
 CHUNK = 40
-MUESTRAS = 32768
+SECONDS = 1         # Duracion de la grabación
+MUESTRAS = 32768    # Rate de muestreo
 vocales = ['a', 'e', 'i', 'o', 'u']
 dir_path = os.path.dirname(os.path.realpath(__file__))
-file_name = dir_path + '\\\\' + 'vocalTest.wav'
+file_name = dir_path + '\\\\' + 'entrada.wav'
 nombre_carpeta_audios = 'audioVocales'
 carpeta_audios = dir_path + "\\" + nombre_carpeta_audios
 
@@ -62,62 +64,83 @@ def FFT(sec,maxBit,bitI):
     return np.array(registro)
 
 """*************************FUNCIONES DE GRABACION/RECONOCIMIENTO************************************"""
-#Funcion para grabar una muestra de sonido
-#Arumentos: 
-#   guardar(Booleano):indica si se desea guardar los rangos calculados en su correspondiente vocal así como recalcular lospromedios
-def grabar(guardar,useMic):
-    #fs = 44100  # Sample rate
-    fs = MUESTRAS
-    seconds = 1  # Duration of recording
+
+#Funcion para agregar una muestra de sonido individual
+def agregar():
+    choice = input('Desea agregar desde archivo de entrada?\ty: SI\totro: NO\n')
+    nombre_persona = input("Ingrese su nombre: ")
+    vocal_ingresada = input("Qué vocal? ")
+    if choice != 'y':
+        file_name = grabar(nombre_persona,vocal_ingresada)
+
+    rangos,secuencia = analizaWAV(file_name)
+    plt.plot(secuencia[:8000],'r-')
+    f = open(f'{vocal_ingresada}.txt','a')
+    f.write(f'{rangos}\n')
+    f.close()
+    promediar()
+    reconocer(rangos,False)
+    plt.show()
+
+def grabar(nombre_persona, vocal):
+    try:
+        os.makedirs(carpeta_audios + '\\' + vocal)
+    except FileExistsError:
+        pass
     
-    if useMic:
-        print('Grabando...')
-        myrecording = sd.rec(int(seconds * fs), samplerate=fs, channels=1)
-        sd.wait()
-        write(file_name, fs, myrecording)  # Save as WAV file 
+    existe=True
+    numero = 0
+    while existe:
+        filepath = carpeta_audios + '\\' + vocal + '\\' + vocal + nombre_persona + str(numero)+'.wav'
+        if os.path.isfile(filepath):
+            numero+=1
+        else:
+            file_name = f'{vocal + nombre_persona+str(numero)}.wav'
+            existe = False
+
+    print(f'Grabando {vocal}...')
+    myrecording = sd.rec(int(SECONDS * MUESTRAS), samplerate=MUESTRAS, channels=1)
+    sd.wait()  # Wait until recording is finished
+    recordPath = carpeta_audios + '\\' + vocal + '\\' + file_name
+    write(recordPath, MUESTRAS, myrecording)  # Save as WAV file
     print('Finalizado!')
 
-    fs, data = read(file_name)
-    arr = np.array(data) # numpy array con la informacion del audio
-    #plt.plot(arr,'r-',alpha=1.0)
-    #fft = np.fft.fft(arr)
+    return recordPath
+
+def analizaWAV(ruta):
+    data = read(ruta)[1]
+    arr = np.array(data)
     bitI,maxBit = bitInverso(arr)
     fft = FFT(arr,maxBit,bitI)
     secuencia = abs(fft)
-
     rangos = []
     ini, fin = 0,0
     for i in range(CHUNK):
         ini = int((4000/CHUNK)*i)
         fin = int(ini+((4000/CHUNK)-1))
         rangos.append(np.mean(secuencia[ini:fin]))
-    """r1 = np.max(secuencia[:59])
-    r2 = np.max(secuencia[61:8000])
-    r = max(r1,r2)
-    freq = np.where(secuencia[:8000] == r)"""
-    #plt.plot(fft,'b-',alpha=0.8)
-    plt.plot(secuencia[:8000],'r-',alpha=0.9)
-    
-    if(guardar):
-        vocal = input('Qué vocal es?\n')
-        f = open(f'{vocal}.txt','a')
-        #f.write(f'{r}\t{freq}\n')
-        f.write(f'{rangos}\n')
-        f.close()
-        promediar()
+    return rangos, secuencia
 
-    #print(f"Magnitud Max = {r} en posición {freq}")
-    print(f'La vocal es: {reconocer(rangos)}')
-    plt.show()
+def cargarAudios():
+    for vocal in vocales:
+        ruta = carpeta_audios+'\\'+vocal
+        directorio = pathlib.Path(ruta)
+        ruta+='\\'
+        f = open(f'{vocal}.txt','w')
+        for fichero in directorio.iterdir():
+            print(f'Analizando {ruta+fichero.name}')
+            f.write(f'{analizaWAV(ruta+fichero.name)[0]}\n')
+        f.close()
+    promediar()
 
 def promediar():
     fproms = open('proms.txt','w')
     for vocal in vocales:
-        filepath = dir_path + '\\\\' + f'{vocal}.txt'
+        filepath = dir_path + '\\' + f'{vocal}.txt'
         if os.path.isfile(filepath):
             f = open(f'{vocal}.txt','r')
         else:
-            f = open(f'{vocal}.txt','w')
+            f = open(f'{vocal}.txt','w+')
         lineas = []
         prom = np.zeros(CHUNK)
         lines = f.readlines()
@@ -138,7 +161,16 @@ def promediar():
     fproms.close()
     print('Promedios actualizados correctamente')
 
-def reconocer(rangos):
+def reconocer(rangos,grabar):
+    if grabar:
+        print('Grabando...')
+        myrecording = sd.rec(int(SECONDS * MUESTRAS), samplerate=MUESTRAS, channels=1)
+        sd.wait()
+        write(file_name, MUESTRAS, myrecording)  # Save as WAV file 
+        print('Finalizado!')
+        rangos,secuencia = analizaWAV(file_name)
+        plt.plot(secuencia[:8000],'r-')
+    
     vowel = 'X'
     f = open('proms.txt','r')
     promRanges = []
@@ -163,41 +195,39 @@ def reconocer(rangos):
             indice=i
             break
     vowel = vocales[indice]
+    print(f'La vocal es: {vowel}')
     return vowel
-
-def grabaVocales():
-    nombre_persona = input("Ingrese su nombre: ")
-    seconds = 1  # Duration of recording
-    for i in range(5):
-        try:
-            os.makedirs(carpeta_audios + '\\' + vocales[i])
-        except FileExistsError:
-            pass
-        print(f'Grabando {vocales[i]}...')
-        file_name = f'{vocales[i] + nombre_persona}.wav'
-        myrecording = sd.rec(int(seconds * MUESTRAS), samplerate=MUESTRAS, channels=1)
-        sd.wait()  # Wait until recording is finished
-        write(carpeta_audios + '\\' + vocales[i]+ '\\' + file_name, MUESTRAS, myrecording)  # Save as WAV file
-        print('Finalizado!')
 
 def menu():
     print('\n*************************RECONOCIMIENTO DE VOCALES A PARTIR DE ESPECTOGRAMA************************************')
-    print("Selecciona una opción\n0: Grabar vocales\n1: Agregar muestra de vocal\n2: Reconocer desde archivo\n3: Reconocer con microfono\n4: Recalcular Promedios\nOtro: Salir")
+    print("Selecciona una opción\n0: Grabar todas las vocales\n1: Agregar muestra de vocal\n2: Reconocer vocal\n3: Recargar todos los audios\nOtro: Salir")
     opc = input()
     if(opc == '0'):
-        grabaVocales()
+        nombre_persona = input("Ingrese su nombre: ")
+        for vocal in vocales:
+            file_name = grabar(nombre_persona,vocal)
+            rangos = analizaWAV(file_name)[0]
+            f = open(f'{vocal}.txt','a')
+            f.write(f'{rangos}\n')
+            f.close()
+        promediar()
         menu()
     elif(opc == '1'):
-        grabar(True,True)
+        agregar()
         menu()
     elif(opc== '2'):
-        grabar(False,False)
+        filepath = dir_path + '\\' + 'proms.txt'
+        if os.path.isfile(filepath):
+            reconocer(0,True)
+            plt.show()
+        else:
+            print('\n**ERROR: Aun no se han agregado muestras, favor de agregar algunas')
         menu()
     elif(opc== '3'):
-        grabar(False,True)
-        menu()
-    elif(opc== '4'):
-        promediar()
+        if os.path.isfile(carpeta_audios+'\\'):
+            cargarAudios()
+        else:
+            print('\n**ERROR: No se han encontrado audios')
         menu()
     else:
         print('Adios mundo :v')
