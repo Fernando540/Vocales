@@ -163,11 +163,14 @@ def promediar():
 
 def reconocer(rangos,grabar):
     if grabar:
-        print('Grabando...')
-        myrecording = sd.rec(int(SECONDS * MUESTRAS), samplerate=MUESTRAS, channels=1)
-        sd.wait()
-        write(file_name, MUESTRAS, myrecording)  # Save as WAV file 
-        print('Finalizado!')
+        archi = input('Desea usar un archivo?\ty: SI\tOtro:NO\n')
+        if archi != 'y':
+            print('Grabando...')
+            myrecording = sd.rec(int(SECONDS * MUESTRAS), samplerate=MUESTRAS, channels=1)
+            sd.wait()
+            write(file_name, MUESTRAS, myrecording)  # Save as WAV file 
+            print('OK!')
+        print('Analizando...')
         rangos,secuencia = analizaWAV(file_name)
         plt.plot(secuencia[:8000],'r-')
     
@@ -224,7 +227,7 @@ def menu():
             print('\n**ERROR: Aun no se han agregado muestras, favor de agregar algunas')
         menu()
     elif(opc== '3'):
-        if os.path.isfile(carpeta_audios+'\\'):
+        if os.path.isdir(carpeta_audios):
             cargarAudios()
         else:
             print('\n**ERROR: No se han encontrado audios')
